@@ -1,0 +1,23 @@
+---
+title: "assignment.Rmd"
+author: "Robin Scheuplein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Week 1
+## Robin Scheuplein
+
+```{r library}
+library(epiwraps)
+```
+
+
+```{r sessionInfo}
+sessionInfo()
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
