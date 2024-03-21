@@ -1,0 +1,83 @@
+---
+title: "assignment.rmd-week04"
+author: "Robin Scheuplein"
+date: '`r Sys.Date()`'
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(AnnotationHub)  #retrieve genomes/annotations
+  library(Rsubread) #alignment
+  library(rtracklayer) #import/export files
+  library(Biostrings)
+  library(Rfastp) #adapter tripping, QC of reads
+  library(epiwraps) #visualiztation
+  library(Rsamtools)
+library(GenomicAlignments)})
+```
+
+```{r}
+ah <- AnnotationHub()
+```
+
+```{r, eval=FALSE}
+dir.create("raw") #create new folder
+
+#Downloading from ENCODE TF p300 peaks in bed-like format in mESC
+url_1 <- "https://www.encodeproject.org/files/ENCFF653YVR/@@download/ENCFF653YVR.bed.gz"
+destination <- "raw/TF_p300.bed.gz"
+download.file(url_1, destfile = destination, mode = "wb")
+
+#Downloading histone modifications H3K4me3
+url_2 <- "https://www.encodeproject.org/files/ENCFF331RHM/@@download/ENCFF331RHM.bed.gz"
+destination <- "raw/H3K4me3.bed.gz"
+download.file(url_2, destfile = destination, mode = "wb")
+
+#Downloading histone modification H3K4me1
+url_3 <- "https://www.encodeproject.org/files/ENCFF426IIV/@@download/ENCFF426IIV.bed.gz"
+destination <- "raw/H3K4me1.bed.gz"
+download.file(url_3, destfile = destination, mode = "wb")
+
+#Downloading histone modification H3K27ac
+url_4 <- "https://www.encodeproject.org/files/ENCFF212HAG/@@download/ENCFF212HAG.bed.gz"
+destination <- "raw/H3K27ac.bed.gz"
+download.file(url_4, destfile = destination, mode = "wb")
+
+#Downloading histone modification H3K27me3
+url_5 <- "https://www.encodeproject.org/files/ENCFF105NKG/@@download/ENCFF105NKG.bed.gz"
+destination <- "raw/H3K27me3.bed.gz"
+download.file(url_5, destfile = destination, mode = "wb")
+```
+
+```{r}
+#Import files
+peaks_p300 <- rtracklayer::import("raw/TF_p300.bed.gz", format = "narrowPeak")
+peaks_H3K4me3 <- rtracklayer::import("raw/H3K4me3.bed.gz", format = "narrowPeak")
+peaks_H3K4me1 <- rtracklayer::import("raw/H3K4me1.bed.gz", format = "narrowPeak")
+peaks_H3K27ac <- rtracklayer::import("raw/H3K27ac.bed.gz", format = "narrowPeak")
+peaks_H3K27me3 <- rtracklayer::import("raw/H3K27me3.bed.gz", format = "narrowPeak")
+```
+
+```{r}
+#Find overlaps
+H3K4me3_overlaps <- overlapsAny(peaks_p300, peaks_H3K4me3) 
+H3K4me3_proportion <- table(H3K4me3_overlaps)[2]/(table(H3K4me3_overlaps)[2]+ table(H3K4me3_overlaps)[1])*100
+cat("For H3K4me3, there is a ", H3K4me3_proportion, "% overlap. ")
+
+H3K4me1_overlaps <- overlapsAny(peaks_p300, peaks_H3K4me1) 
+H3K4me1_proportion <- table(H3K4me1_overlaps)[2]/(table(H3K4me1_overlaps)[2]+ table(H3K4me1_overlaps)[1])*100
+cat("For H3K4me1, there is a ", H3K4me1_proportion, "% overlap. ")
+
+H3K27ac_overlaps <- overlapsAny(peaks_p300, peaks_H3K27ac) 
+H3K27ac_proportion <- table(H3K27ac_overlaps)[2]/(table(H3K27ac_overlaps)[2]+ table(H3K27ac_overlaps)[1])*100
+cat("For H3K27ac, there is a ", H3K27ac_proportion, "% overlap. ")
+
+H3K27me3_overlaps <- overlapsAny(peaks_p300, peaks_H3K27me3) 
+H3K27me3_proportion <- table(H3K27me3_overlaps)[2]/(table(H3K27me3_overlaps)[2]+ table(H3K27me3_overlaps)[1])*100
+cat("For H3K27me3, there is a ", H3K27me3_proportion, "% overlap. ")
+```
+
+
+
+
