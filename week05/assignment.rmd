@@ -1,0 +1,95 @@
+---
+title: "assignment.rmd"
+author: "Robin Scheuplein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(AnnotationHub)  #retrieve genomes/annotations
+  library(Rsubread) #alignment
+  library(rtracklayer) #import/export files
+  library(Biostrings)
+  library(Rfastp) #adapter tripping, QC of reads
+  library(epiwraps) #visualiztation
+  library(Rsamtools)
+library(GenomicAlignments)})
+```
+
+
+```{r}
+ah <- AnnotationHub()
+```
+
+```{r}
+dir.create("raw") #create new folder
+
+#Downloading histone modifications H3K4me3
+url_2 <- "https://www.encodeproject.org/files/ENCFF331RHM/@@download/ENCFF331RHM.bed.gz"
+destination <- "raw/H3K4me3.bed.gz"
+download.file(url_2, destfile = destination, mode = "wb")
+
+#Downloading histone modification H3K27me3
+url_5 <- "https://www.encodeproject.org/files/ENCFF105NKG/@@download/ENCFF105NKG.bed.gz"
+destination <- "raw/H3K27me3.bed.gz"
+download.file(url_5, destfile = destination, mode = "wb")
+```
+```{r}
+#Import files
+peaks_H3K4me3 <- rtracklayer::import("raw/H3K4me3.bed.gz", format = "narrowPeak")
+peaks_H3K27me3 <- rtracklayer::import("raw/H3K27me3.bed.gz", format = "narrowPeak")
+```
+
+```{r}
+#find overlaps
+bivalent_overlaps <- overlapsAny(peaks_H3K4me3, peaks_H3K27me3)
+bivalent_domains <- peaks_H3K4me3 [bivalent_overlaps]
+length(bivalent_domains)
+cat("There are" ,length(bivalent_domains), "bivalent domains")
+```
+
+```{r}
+dir.create("raw/hepatocyte") #create new folder
+
+#Downloading H3K4me3 histone modifications for hepatocytes
+url_6 <- "https://www.encodeproject.org/files/ENCFF252RRE/@@download/ENCFF252RRE.bed.gz"
+destination <- "raw/hepatocyte/H3K4me3.bed.gz"
+download.file(url_6, destfile = destination, mode = "wb")
+
+#Downloading H3K27me3 histone modifications for hepatocytes
+url_7 <- "https://www.encodeproject.org/files/ENCFF290NCY/@@download/ENCFF290NCY.bed.gz"
+destination <- "raw/hepatocyte/H3K27me3.bed.gz"
+download.file(url_7, destfile = destination, mode = "wb")
+
+```
+```{r}
+peaks_hepatocyte_H3K4me3 <- rtracklayer::import("raw/hepatocyte/H3K4me3.bed.gz", format = "narrowPeak")
+peaks_hepatocyte_H3K27me3 <- rtracklayer::import("raw/hepatocyte/H3K27me3.bed.gz", format = "narrowPeak")
+```
+
+```{r}
+# How many of the mESC bivalent domains are, in this differentiated cell type, overlapping either mark or their combination (in this differentiated cell type)?
+
+#find overlaps
+H3K4me3_bi_domains_overlaps <- overlapsAny(bivalent_domains, peaks_hepatocyte_H3K4me3)
+H3K27me3_bi_domains_overlaps <- overlapsAny(bivalent_domains, peaks_hepatocyte_H3K27me3)
+bivalent_domains_hepaocyte_H3K4me3 <- bivalent_domains[H3K4me3_bi_domains_overlaps]
+bivalent_domains_hepaocyte_H3K27me3 <- bivalent_domains[H3K27me3_bi_domains_overlaps]
+
+cat("There are" ,length(bivalent_domains_hepaocyte_H3K4me3), "H3K4me3 histone modifications overlapping the mESC bivalent domains.")
+cat(" There are" ,length(bivalent_domains_hepaocyte_H3K27me3), "H3K27me3 histone modifications overlapping the mESC bivalent domains.")
+
+bivalent_hepaotcyte_overlaps <- overlapsAny(peaks_hepatocyte_H3K4me3, peaks_hepatocyte_H3K27me3)
+bivalent_hepaotcyte_domains <- peaks_hepatocyte_H3K4me3 [bivalent_hepaotcyte_overlaps]
+mESC_bi_domain_hepa_bi_domain_overlap <- overlapsAny(bivalent_domains, bivalent_hepaotcyte_domains)
+domain_mESC_bi_domain_hepa_bi_domain_overlap <- bivalent_domains[mESC_bi_domain_hepa_bi_domain_overlap]
+
+cat("There are" ,length(domain_mESC_bi_domain_hepa_bi_domain_overlap), "mESC bivalent domains overlapping with hepatocyte bivalent domains.")
+
+
+```
+```{r}
+#Out of the 3105 mESC bivalent domains, 2208 stay bivalent domains in differentiated hepatocytes, thus might not be important during the cell differentiation. The other 807 bivalent domains  are important for differentiation. 2311-2208= 103 promoter regions become activated by removing the H3K27me3 methylation and 753 promoter regions get inactivated by removing the H3K4me3 methylation.
+```
+
