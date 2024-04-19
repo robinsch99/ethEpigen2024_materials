@@ -1,0 +1,87 @@
+---
+title: "assignment.rmd"
+author: "Robin Scheuplein"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("PWMEnrich")
+```
+
+```{r}
+suppressPackageStartupMessages({
+  library(AnnotationHub)
+  library(GenomicRanges)
+  library(ggplot2)
+  library(memes) # for the meme-based methods -- COMMENT OUT when using alternatives
+  library(motifmatchr) # for scanning sequences for matches of given motifs
+  library(Biostrings) # for handling sequences
+  library(MotifDb) # database of motifs
+  library(TFBSTools) # for handling some motif formats
+  library(universalmotif) # for converting motifs to various formats
+  library(PWMEnrich) # for R-based motif enrichment analysis
+})
+```
+
+#download chip seq for CREB1
+```{r}
+download.file("https://www.encodeproject.org/files/ENCFF216EYM/@@download/ENCFF216EYM.bed.gz", "A549_ATF3_ENCFF216EYM.bed.gz")
+peaks <- rtracklayer::import("A549_ATF3_ENCFF216EYM.bed.gz", format="NarrowPeak")
+seqlevelsStyle(peaks) <- "Ensembl"  # to change the convention of the chromosome names to ensembl (i.e. without 'chr')
+peaks_chr1 <- peaks[seqnames(peaks)=="1"]
+```
+#get genome sequence
+```{r}
+ah <- AnnotationHub()
+homo_sapiens_genome <- AnnotationHub::query(ah, c("Homo sapiens", "ENSEMBL", "GRCh38", "2bit", "dna_sm")) #query for genome sequence
+homo_sapiens_genome #select genome sequence
+genome <- ah[["AH106285"]]
+
+# we'll load it into memory:
+genome_seqs <- import(genome)
+genome_seqs
+```
+
+# Identify the instances of the factor's motif
+```{r}
+# we search for "ATF3" in the motif database
+motifs <- query(MotifDb, "ATF3")
+# there are several matching motifs:
+names(motifs)
+# we select one:
+motif <- motifs[["Hsapiens-HOCOMOCOv10-ATF3_HUMAN.H10MO.A"]]
+motif
+# we visualize it:
+view_motifs(motifs[1:2])
+```
+#Of all the peaks, what proportion contains a motif for the factor?
+```{r}
+# convert the motif to a format that this package will accept
+motif2 <- convert_motifs(motif, class="TFBSTools-PWMatrix")
+# Motif matching for peaks in chr1
+moi <- motifmatchr::matchMotifs(motif2, subject=peaks_chr1, genome=Rsamtools::FaFile("genome.fa"),
+                                out="positions") # specify that we want the function to return the genomic positions of each motif match
+moi_overlaps <- overlapsAny(peaks_chr1, moi)
+table(moi_overlaps)
+length(peaks_chr1)
+cat("Of the", length(peaks_chr1), "peaks in Chr1,", table(moi_overlaps)[2], "(", table(moi_overlaps)[2]/length(peaks_chr1)*100, "%) contain a motif")
+
+```
+#Of all instances of that motif in the genome (or in one chromosome), what proportion is bound by the factor (i.e. has a peak)?
+```{r}
+# run the scan:
+motif_across_genome <- matchMotifs(motif2, subject=genome_seqs, out="positions")[[1]]
+# to transform the output to GRanges:
+names(motif_across_genome) <- names(genome_seqs)
+motif_across_genome <- as(motif_across_genome, "GRanges")
+#number of ATF3 motifs in the genome
+table(motif_across_genome)
+#ATF3 motifs across the genome, that ATF3 binds to (i.e. shows a peak)
+motif_across_genome_overlaps <- overlapsAny(peaks, motif_across_genome)
+table(motif_across_genome_overlaps)
+cat("Of the", length(motif_across_genome), "motif instances,", table(motif_across_genome_overlaps)[2], "(", table(motif_across_genome_overlaps)[2]/length(motif_across_genome)*100, "%) overlap a peak")
+```
