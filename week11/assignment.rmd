@@ -1,0 +1,114 @@
+---
+title: "assignment.rmd"
+author: "Robin Scheuplein"
+date: "2024-05-23"
+output: html_document
+---
+
+```{r}
+suppressPackageStartupMessages({
+  library(GenomicRanges)
+  library(epiwraps)
+  library(ggplot2)
+  library(rGREAT)
+  library(AnnotationHub)
+  library(ensembldb)
+  library(bsseq)
+  library(BiocParallel)
+  library(edgeR)
+  library(DMRcate)
+  library(rtracklayer)
+  library(sechm)
+  library(pheatmap)
+  library(viridis)
+  library(data.table)
+  library(SummarizedExperiment)
+})
+
+set.seed(40)
+```
+
+
+```{r}
+options(timeout = 6000)
+download.file("https://ethz-ins.org/content/w11_practical.zip", "w11_practical.zip")
+dir.create("./w11_practical")
+unzip("w11_practical.zip", exdir="./w11_practical")
+```
+
+## Plot a heatmap of the methylation levels of the genes in top 5 DMR regions.
+
+```{r}
+#load data
+bs <- readRDS("./w11_practical/bs.rds")
+dmr <- readRDS("dmrRanges.rds")
+dmr
+# Sorting DMRs by the absolute value of their mean difference
+dmrData <- dmr[order(abs(dmr$meandiff), decreasing=TRUE)]
+dmrRangesGenes <- dmr[!is.na(dmr$overlapping.genes)]
+dmrRangesGenes
+top_dmrRangesGenes <- head(dmrRangesGenes, 5) #get top 5 dmr and overlapping genes
+top_dmrRangesGenes
+dmrRangesGenes[1:5]
+
+# Get the genes within Differentially methylated regions
+#topIdx <- order(dmrRangesGenes$min_smoothed_fdr)[1:10]
+#genesDmr <- unlist(tstrsplit(dmrRangesGenes[topIdx]$overlapping.genes, split=", "))
+#genesDmr <- genesDmr[!is.na(genesDmr)]
+#dmrGenes <- genesChr22[genesChr22$gene_name %in% genesDmr]
+#dmrGenes
+
+
+metPr <- bsseq::getMeth(bs, 
+                           regions=top_dmrRangesGenes, 
+                           what="perRegion")
+
+#Plot a heatmap of the methylation levels of the genes in top 5 DMR regions.
+colnames(metPr) <- colnames(bs)
+rownames(metPr) <- top_dmrRangesGenes$overlapping.genes
+metPr <- metPr[!is.na(rowSums(metPr)),]
+rownames(metPr)
+annotationCol <- as.data.frame(pData(bs))
+rownames(annotationCol) <- colnames(metPr)
+
+pheatmap::pheatmap(metPr, 
+                   cluster_rows=TRUE,
+                   cluster_cols=FALSE,
+                   annotation_col=annotationCol,
+                   show_rownames=TRUE,
+                   show_colnames=TRUE,
+                   color=viridis::rocket(10))
+```
+
+```{r}
+#Enrichment analysis
+
+# genes
+ah <- AnnotationHub()
+ensdb <- ah[["AH109336"]]
+chr22 <-  GRanges(seqnames=Rle(c("22")), 
+                  ranges = IRanges(1, end=50818468))
+
+genesChr22 <- genes(ensdb, columns=c("gene_seq_start", "gene_seq_end", "gene_name"),
+                    filter=GRangesFilter(chr22))
+
+seqlevelsStyle(dmrRangesGenes) <- "UCSC"
+res <- great(dmrRangesGenes, gene_sets="GO:BP", tss_source="hg38", 
+             background="chr22", cores=2)
+bp <- getEnrichmentTables(res)
+bp
+```
+
+#We plot the top Biological Processes:
+
+```{r, fig.width=9, fig.height=6}
+ggplot(head(bp,15), aes(fold_enrichment, reorder(description, p_adjust), 
+                        size=observed_region_hits, color=-log10(p_adjust))) + 
+  geom_point() + scale_color_viridis_c()
+```
+#Interpretation
+The enrichment analysis shows the biological processes associated with the genes that are in the dmr, so it shows which processes are highly enriched in the dme genes compared to chromosome 22 and the biological processes encoded on it. Here, the genes annotated with the GO term membrane organization show the highest fold_enrichment, but the count of differentially expressed genes belonging to this term is low. In contrast. genes annotated with the GO term 'biological processes' are fold_enriched by 1.1, and have a count of 2000 differentially expressed genes.
+
+
+
+
